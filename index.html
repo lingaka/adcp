@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADCP Ocean Current Monitoring System</title>
+    <!-- Using specific version of Chart.js to avoid source map issues -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+         .monitoring-button {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, rgba(0,102,204,0.9), rgba(0,77,153,0.9));
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            font-family: 'Montserrat', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+        }
+        
+        .monitoring-button i {
+            margin-right: 10px;
+            font-size: 1.1em;
+            transition: transform 0.3s ease;
+        }
+        
+        .monitoring-button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, rgba(0,102,204,1), rgba(0,77,153,1));
+        }
+        
+        .monitoring-button:hover i {
+            transform: rotate(15deg);
+        }
+        
+        .monitoring-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+        
+        .monitoring-button:hover::before {
+            left: 100%;
+        }
+        :root {
+            --primary-blue: #0066cc;
+            --dark-blue: #004d99;
+            --light-blue: #e6f2ff;
+            --accent-blue: #4da6ff;
+            --text-dark: #2c3e50;
+            --text-medium: #4a5568;
+            --text-light: #718096;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+        
+        body {
+            font-family: 'Open Sans', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: var(--text-medium);
+            background-image: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.9)), 
+                            url('https://usagif.com/wp-content/uploads/2022/hqgif/ocean-wave-53-light-blue-waves.gif');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            scroll-behavior: smooth;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            background: var(--white);
+            padding: 2.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        /* Enhanced Table of Contents */
+        .toc-container {
+            background: linear-gradient(135deg, var(--light-blue), #d4e6ff);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 2.5rem;
+            border: 1px solid var(--accent-blue);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .toc-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" fill="none" stroke="%234da6ff" stroke-width="0.5" stroke-opacity="0.3"><path d="M0,0 L100,100 M100,0 L0,100"/></svg>');
+            opacity: 0.1;
+        }
+        
+        .toc-title {
+            font-family: 'Montserrat', sans-serif;
+            color: var(--primary-blue);
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .toc-title::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -5px;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary-blue), transparent);
+        }
+        
+        .toc-list {
+            columns: 2;
+            padding-left: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .toc-list li {
+            margin-bottom: 0.75rem;
+            break-inside: avoid;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        
+        .toc-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary-blue);
+            transition: var(--transition);
+        }
+        
+        .toc-list a {
+            color: var(--primary-blue);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 500;
+            display: inline-block;
+            padding: 0.2rem 0;
+        }
+        
+        .toc-list a:hover {
+            color: var(--dark-blue);
+            transform: translateX(5px);
+        }
+        
+        .toc-list li:hover::before {
+            transform: translateX(5px);
+        }
+        
+        header {
+            text-align: center;
+            padding: 2rem 0;
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+        
+        header::after {
+            content: '';
+            display: block;
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-blue), var(--accent-blue));
+            margin: 1.5rem auto 0;
+            border-radius: 2px;
+        }
+        
+        h1, h2, h3 {
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-dark);
+        }
+        
+        h1 {
+            color: var(--primary-blue);
+            font-size: 2.8rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            font-size: 2rem;
+            margin-top: 3.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--light-blue);
+            position: relative;
+            scroll-margin-top: 100px;
+        }
+        
+        h2::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -2px;
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-blue), transparent);
+        }
+        
+        h3 {
+            font-size: 1.5rem;
+            color: var(--primary-blue);
+            margin-top: 2.5rem;
+            margin-bottom: 1.2rem;
+            position: relative;
+            padding-left: 1rem;
+        }
+        
+        h3::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary-blue);
+            border-radius: 2px;
+        }
+        
+        .content-section {
+            margin-bottom: 4rem;
+            position: relative;
+        }
+        
+        .content-section::after {
+            content: '';
+            display: block;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0,102,204,0.2), transparent);
+            margin-top: 3rem;
+        }
+        
+        .image-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2.5rem 0;
+        }
+        
+        .image-card {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            border: 1px solid rgba(0,0,0,0.05);
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+        
+        .image-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(0,102,204,0.1), rgba(0,102,204,0.3));
+            opacity: 0;
+            transition: var(--transition);
+        }
+        
+        .image-card:hover::after {
+            opacity: 1;
+        }
+        
+        .image-card img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: var(--transition);
+        }
+        
+        .image-card:hover img {
+            transform: scale(1.05);
+        }
+        
+        .image-caption {
+            padding: 1.25rem;
+            font-size: 0.95rem;
+            color: var(--text-medium);
+            background: var(--white);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .image-caption::before {
+            content: '🛈';
+            margin-right: 0.5rem;
+            color: var(--primary-blue);
+        }
+        
+        /* Enhanced Image Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            overflow: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal.show {
+            opacity: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            max-width: 90%;
+            max-height: 80vh;
+            object-fit: contain;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+        
+        .modal-caption {
+            margin-top: 1rem;
+            text-align: center;
+            color: #f1f1f1;
+            font-size: 1.2rem;
+            max-width: 80%;
+        }
+        
+        .close {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        
+        .close:hover {
+            color: #fff;
+            opacity: 1;
+            transform: rotate(90deg);
+        }
+        
+        .data-panel {
+            background: linear-gradient(135deg, var(--light-blue), #d4e6ff);
+            padding: 2.5rem;
+            border-radius: var(--border-radius);
+            margin: 4rem 0;
+            border: 1px solid var(--accent-blue);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .data-panel::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-blue), var(--accent-blue));
+        }
+        
+        .data-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        
+        .data-item {
+            background: linear-gradient(135deg, var(--primary-blue), var(--dark-blue));
+            color: var(--white);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .data-item::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.2));
+            z-index: -1;
+        }
+        
+        .data-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .data-value {
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin: 0.75rem 0;
+            font-family: 'Montserrat', sans-serif;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .data-value::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 2px;
+            background: rgba(255,255,255,0.5);
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 2rem 0;
+            justify-content: center;
+        }
+        
+        button {
+            background: linear-gradient(135deg, var(--primary-blue), var(--dark-blue));
+            color: var(--white);
+            border: none;
+            padding: 0.9rem 1.8rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+            font-family: 'Montserrat', sans-serif;
+            min-width: 200px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--dark-blue), var(--primary-blue));
+            opacity: 0;
+            transition: var(--transition);
+            z-index: -1;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:hover::before {
+            opacity: 1;
+        }
+        
+        #profileChart {
+            margin-top: 2.5rem;
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .tech-specs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2.5rem 0;
+        }
+        
+        .spec-card {
+            background: var(--white);
+            padding: 1.8rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .spec-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary-blue), var(--accent-blue));
+        }
+        
+        .spec-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .spec-card h3 {
+            color: var(--primary-blue);
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .spec-card h3 i {
+            margin-right: 0.8rem;
+            font-size: 1.2rem;
+        }
+        
+        .spec-card ul {
+            padding-left: 1.5rem;
+        }
+        
+        .spec-card li {
+            margin-bottom: 0.8rem;
+            color: var(--text-medium);
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        
+        .spec-card li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--primary-blue);
+            font-weight: bold;
+        }
+        
+        .references {
+            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(230,242,255,0.95));
+            padding: 2.5rem;
+            border-radius: var(--border-radius);
+            margin-top: 4rem;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+        }
+        
+        .references::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-blue), var(--accent-blue));
+        }
+        
+        .references ul {
+            padding-left: 1.5rem;
+        }
+        
+        .references a {
+            color: var(--primary-blue);
+            text-decoration: none;
+            transition: var(--transition);
+            display: inline-block;
+            padding: 0.2rem 0;
+            border-bottom: 1px dashed rgba(0,102,204,0.3);
+        }
+        
+        .references a:hover {
+            color: var(--dark-blue);
+            border-bottom-color: var(--dark-blue);
+            transform: translateX(3px);
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 4rem;
+            padding: 2rem 0 0;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary-blue), transparent);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+                margin: 1rem;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            h2 {
+                font-size: 1.7rem;
+            }
+            
+            .toc-list {
+                columns: 1;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .data-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+       <!-- Add this button at the top of your page -->
+       <a href="realtime-monitoring.html" class="monitoring-button">
+        <i class="fas fa-chart-line"></i>
+        Live Monitoring
+    </a>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-water" style="margin-right: 15px;"></i>Acoustic Doppler Current Profiler Monitoring</h1>
+            <p>Advanced ocean current measurement technology for research and industry</p>
+        </header>
+
+        <!-- Enhanced Table of Contents -->
+        <div class="toc-container">
+            <h3 class="toc-title"><i class="fas fa-list-ul" style="margin-right: 10px;"></i>Navigation Menu</h3>
+            <ul class="toc-list">
+                <li><a href="#about"><i class="fas fa-info-circle"></i> About ADCP Technology</a></li>
+                <li><a href="#how-it-works"><i class="fas fa-cogs"></i> How ADCPs Work</a></li>
+                <li><a href="#applications"><i class="fas fa-tasks"></i> Applications</a></li>
+                <li><a href="#measurement"><i class="fas fa-ruler"></i> Measurement Capabilities</a></li>
+                <li><a href="#deployment"><i class="fas fa-map-marked-alt"></i> Deployment Options</a></li>
+                <li><a href="#scientific"><i class="fas fa-flask"></i> Scientific Research</a></li>
+                <li><a href="#industrial"><i class="fas fa-industry"></i> Industrial Applications</a></li>
+                <li><a href="#references"><i class="fas fa-book"></i> References</a></li>
+            </ul>
+        </div>
+
+        <!-- Image Modal -->
+        <div id="imageModal" class="modal">
+            <span class="close">&times;</span>
+            <img class="modal-content" id="modalImage">
+            <div id="modalCaption" class="modal-caption"></div>
+        </div>
+
+        <div class="content-section" id="about">
+            <h2><i class="fas fa-info-circle" style="margin-right: 15px;"></i>About ADCP Technology</h2>
+            <p>Acoustic Doppler Current Profilers (ADCPs) are sophisticated instruments that measure water current velocities throughout the water column using the Doppler effect of sound waves scattered back from particles in the water. These systems are essential tools for oceanographers, hydrologists, and marine engineers.</p>
+            
+            <p>ADCP technology was first developed in the 1980s and has since revolutionized oceanographic research by providing continuous, high-resolution current profiles without the need for mechanical sensors that could interfere with measurements. Modern ADCPs can operate in various marine environments, from shallow rivers to deep ocean trenches, offering unprecedented insights into water movement patterns.</p>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://deepwaterbuoyancy.com/wp-content/uploads/stablemoor-adcp-deployment-with-nortek-signature500-3.jpg" alt="ADCP Deployment" onclick="openModal(this)">
+                    <div class="image-caption">ADCP being deployed from a research vessel during oceanographic survey</div>
+                </div>
+                <div class="image-card">
+                    <img src="image.jpeg" alt="ADCP Diagram" onclick="openModal(this)">
+                    <div class="image-caption">Detailed diagram showing the operational principle of ADCP technology</div>
+                </div>
+            </div>
+            
+            <h3 id="measurement"><i class="fas fa-ruler-combined"></i> Measurement Principles</h3>
+            <p>The fundamental principle behind ADCP technology is the Doppler shift, which describes how the frequency of sound waves changes when reflected off moving particles. By emitting acoustic pulses at known frequencies and measuring the frequency shift of the returning echoes, ADCPs can calculate the velocity of water currents at multiple depth levels simultaneously with remarkable precision.</p>
+            
+            <p>Key components of an advanced ADCP system include:</p>
+            <ul>
+                <li><strong><i class="fas fa-broadcast-tower"></i> Transducers:</strong> High-precision elements that emit and receive acoustic signals across multiple beams</li>
+                <li><strong><i class="fas fa-project-diagram"></i> Beam Configuration:</strong> Typically 4-5 beams arranged in a Janus configuration for 3D vector resolution</li>
+                <li><strong><i class="fas fa-microchip"></i> Signal Processor:</strong> Advanced DSP algorithms analyze Doppler shifts and calculate velocities</li>
+                <li><strong><i class="fas fa-database"></i> Data Logger:</strong> High-capacity storage for extended measurement campaigns</li>
+                <li><strong><i class="fas fa-battery-full"></i> Power Supply:</strong> Robust battery systems with low-power modes for long-term deployments</li>
+                <li><strong><i class="fas fa-compass"></i> Orientation Sensors:</strong> Integrated compass and tilt sensors for accurate directional data</li>
+            </ul>
+            
+            <h3><i class="fas fa-history"></i> Historical Development</h3>
+            <p>The evolution of ADCP technology has been marked by several key milestones:</p>
+            <ul>
+                <li><strong>1980s:</strong> First commercial ADCPs developed for oceanographic research</li>
+                <li><strong>1990s:</strong> Introduction of broadband signal processing for improved accuracy</li>
+                <li><strong>2000s:</strong> Miniaturization enables deployment on autonomous platforms</li>
+                <li><strong>2010s:</strong> Integration with satellite telemetry for real-time data access</li>
+                <li><strong>2020s:</strong> AI-enhanced data processing and cloud integration</li>
+            </ul>
+        </div>
+
+        <div class="content-section" id="how-it-works">
+            <h2><i class="fas fa-cogs" style="margin-right: 15px;"></i>How ADCPs Work</h2>
+            <p>ADCPs utilize the Doppler shift phenomenon to measure current profiles with remarkable accuracy. The measurement process involves several sophisticated steps that work together to provide comprehensive current data throughout the water column, enabling researchers to understand complex hydrodynamic phenomena.</p>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://uhslc.soest.hawaii.edu/sadcp/icons/adcp_img.gif" onclick="openModal(this)">
+                    <img src="" alt="ADCP Working Principle" onclick="openModal(this)">
+                    <div class="image-caption">Detailed schematic of ADCP working principles and beam geometry</div>
+                </div>
+            </div>
+            
+            <ol>
+                <li><strong><i class="fas fa-wave-square"></i> Sound Emission:</strong> Transducers emit precisely timed acoustic pulses at specific frequencies (typically 75kHz-2MHz) in multiple directions, with frequency selection based on desired range and resolution</li>
+                <li><strong><i class="fas fa-dot-circle"></i> Particle Scattering:</strong> Sound waves reflect off suspended particles (plankton, sediment, bubbles) moving with water currents, with scattering intensity depending on particle concentration and size distribution</li>
+                <li><strong><i class="fas fa-exchange-alt"></i> Doppler Shift:</strong> The frequency of returning echoes shifts proportionally to particle velocity relative to the transducer, with shifts measured with extreme precision (typically ±0.1% accuracy)</li>
+                <li><strong><i class="fas fa-vector-square"></i> Beam Configuration:</strong> Multiple beams (typically 4-5) enable 3D current vector calculation through trigonometric relationships, with beam angles carefully calibrated</li>
+                <li><strong><i class="fas fa-layer-group"></i> Profile Generation:</strong> Measurements are binned at various depth intervals (configurable from 0.25m to 8m) to create full water column profiles, with blanking distance compensation</li>
+                <li><strong><i class="fas fa-filter"></i> Data Processing:</strong> Advanced algorithms filter noise, validate measurements, and apply quality control before final velocity calculations, including error velocity estimation</li>
+            </ol>
+            
+            <h3><i class="fas fa-sliders-h"></i> Technical Considerations</h3>
+            <p>The performance of ADCP systems depends on several technical factors that researchers must consider when planning deployments:</p>
+            
+            <div class="tech-specs">
+                <div class="spec-card">
+                    <h3 id="measurement"><i class="fas fa-tachometer-alt"></i> Measurement Capabilities</h3>
+                    <ul>
+                        <li><i class="fas fa-tachometer-alt"></i> Current speeds from 0.01 to 5+ m/s with 0.1% accuracy</li>
+                        <li><i class="fas fa-compass"></i> Direction accuracy ±2° with compass calibration</li>
+                        <li><i class="fas fa-ruler-vertical"></i> Depth ranges from 10m to 1000m+ depending on frequency</li>
+                        <li><i class="fas fa-arrows-alt-v"></i> Vertical resolution from 0.25m to 8m adjustable</li>
+                        <li><i class="fas fa-clock"></i> Sampling rates from 1Hz to 2Hz for high-resolution studies</li>
+                        <li><i class="fas fa-angle-double-right"></i> Beam angles typically 20-30° from vertical</li>
+                        <li><i class="fas fa-arrows-alt-h"></i> Blank distance (minimum range) typically 0.5-2m</li>
+                        <li><i class="fas fa-temperature-low"></i> Temperature measurement accuracy ±0.1°C</li>
+                    </ul>
+                </div>
+                <div class="spec-card">
+                    <h3 id="deployment"><i class="fas fa-satellite-dish"></i> Deployment Options</h3>
+                    <ul>
+                        <li><i class="fas fa-anchor"></i> Bottom-mounted (long-term monitoring with frames or tripods)</li>
+                        <li><i class="fas fa-ship"></i> Vessel-mounted (shipboard surveys with through-hull or pole mounts)</li>
+                        <li><i class="fas fa-buoy"></i> Moored (subsurface buoys with buoyancy packages)</li>
+                        <li><i class="fas fa-robot"></i> Autonomous platforms (AUVs/gliders with specialized housings)</li>
+                        <li><i class="fas fa-bridge"></i> Fixed installations (harbors, bridges with permanent mounts)</li>
+                        <li><i class="fas fa-fish"></i> Towfish configurations (for mobile surveys)</li>
+                        <li><i class="fas fa-icicles"></i> Ice-mounted (for polar research applications)</li>
+                        <li><i class="fas fa-water"></i> Floating platforms (for surface current measurements)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3><i class="fas fa-wave-square"></i> Frequency Considerations</h3>
+            <p>The operating frequency of an ADCP significantly impacts its performance characteristics, requiring careful selection based on study objectives:</p>
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://www.nortekgroup.com/assets/images/Current-velocity.jpg" alt="ADCP Frequency Comparison" onclick="openModal(this)">
+                    <div class="image-caption">Different frequency of ADCPs</div>
+                </div>
+                <div class="image-card">
+                    <img src="https://www.nortekgroup.com/assets/images/Coastal-landscape-spread-1.jpg" alt="ADCP Deployment Options" onclick="openModal(this)">
+                    <div class="image-caption">Various deployment configurations for ADCPs</div>
+                </div>
+            </div>
+            <ul>
+                <li><strong><i class="fas fa-bullseye"></i> High Frequency (300kHz-2MHz):</strong> Shorter range (10-50m) but higher resolution, ideal for shallow water studies, coastal processes, and laboratory applications where fine detail is required</li>
+                <li><strong><i class="fas fa-balance-scale"></i> Medium Frequency (75kHz-300kHz):</strong> Balanced range (50-300m) and resolution for most oceanographic applications, including continental shelf studies and harbor monitoring</li>
+                <li><strong><i class="fas fa-expand"></i> Low Frequency (38kHz-75kHz):</strong> Long range (300-1000m+) but lower resolution, essential for deep water studies, major current systems, and basin-scale circulation patterns</li>
+            </ul>
+        </div>
+
+        <div class="content-section" id="applications">
+            <h2><i class="fas fa-tasks" style="margin-right: 15px;"></i>Applications</h2>
+            <p>ADCPs serve critical roles across multiple marine sectors, providing essential data for scientific research, industrial operations, and environmental monitoring. Their ability to measure full water column currents without intrusive instrumentation makes them invaluable for numerous applications requiring hydrodynamic characterization.</p>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/BlackSmoker.jpg/250px-BlackSmoker.jpg" alt="Ocean Research" onclick="openModal(this)">
+                    <div class="image-caption">ADCP array researching hydrothermal vent systems and deep ocean currents</div>
+                </div>
+                <div class="image-card">
+                    <img src="https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/styles/full_width/public/Lowell_Alvin_ADCP.jpg?itok=zJG0x9Ih" alt="Offshore Industry" onclick="openModal(this)">
+                    <div class="image-caption">River dynamics study using ADCP for sediment transport analysis</div>
+                </div>
+                <div class="image-card">
+                    <img src="https://www.benarnews.org/english/news/philippine/buoys-command-posts-05202022122940.html/220520-ph-buoy-screengrab.jpg/@@images/d185c108-e55c-4478-bc87-b4dbe2b76a69.jpeg" alt="Navigation" onclick="openModal(this)">
+                    <div class="image-caption">Mooring analysis and current visualization for offshore platform safety</div>
+                </div>
+            </div>
+            
+            <div class="tech-specs">
+                <div class="spec-card">
+                    <h3 id="scientific"><i class="fas fa-flask"></i> Scientific Research</h3>
+                    <ul>
+                        <li><i class="fas fa-globe-americas"></i> <strong>Ocean circulation studies:</strong> Mapping large-scale current systems and eddies that transport heat and nutrients across ocean basins</li>
+                        <li><i class="fas fa-thermometer-three-quarters"></i> <strong>Climate change monitoring:</strong> Tracking changes in ocean heat transport and meridional overturning circulation</li>
+                        <li><i class="fas fa-mountain"></i> <strong>Sediment transport analysis:</strong> Measuring currents that move seabed materials, affecting coastal erosion and deposition</li>
+                        <li><i class="fas fa-bolt"></i> <strong>Tidal energy assessment:</strong> Characterizing potential renewable energy sites with detailed current resource mapping</li>
+                        <li><i class="fas fa-fish"></i> <strong>Biological studies:</strong> Relating currents to plankton distribution, larval dispersal, and fish migration patterns</li>
+                        <li><i class="fas fa-snowflake"></i> <strong>Polar research:</strong> Monitoring ice-ocean interactions in Arctic and Antarctic regions affected by climate change</li>
+                        <li><i class="fas fa-umbrella-beach"></i> <strong>Coastal processes:</strong> Studying nearshore circulation, rip currents, and sediment dynamics affecting beaches</li>
+                        <li><i class="fas fa-vial"></i> <strong>Laboratory studies:</strong> Validating numerical models with precise velocity measurements in controlled environments</li>
+                    </ul>
+                </div>
+                <div class="spec-card">
+                    <h3 id="industrial"><i class="fas fa-industry"></i> Industrial Applications</h3>
+                    <ul>
+                        <li><i class="fas fa-oil-well"></i> <strong>Offshore platform operations:</strong> Monitoring currents for safe drilling operations and structure loading</li>
+                        <li><i class="fas fa-dumpster"></i> <strong>Dredging operations:</strong> Tracking sediment plumes and current effects for environmental compliance</li>
+                        <li><i class="fas fa-anchor"></i> <strong>Port and harbor management:</strong> Maintaining navigation channels and assessing siltation patterns</li>
+                        <li><i class="fas fa-pipe"></i> <strong>Pipeline and cable laying:</strong> Assessing bottom currents for installation planning and stability analysis</li>
+                        <li><i class="fas fa-fan"></i> <strong>Renewable energy projects:</strong> Site assessment for tidal and wind farms, including resource characterization</li>
+                        <li><i class="fas fa-fish"></i> <strong>Aquaculture:</strong> Monitoring water exchange at fish farms and shellfish operations</li>
+                        <li><i class="fas fa-ship"></i> <strong>Navigation safety:</strong> Providing real-time current data for shipping lanes and harbor approaches</li>
+                        <li><i class="fas fa-bridge-water"></i> <strong>Hydraulic engineering:</strong> Assessing flow patterns around structures like bridges and dams</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3><i class="fas fa-book-open"></i> Case Studies</h3>
+            <p><strong><i class="fas fa-stream"></i> Gulf Stream Monitoring:</strong> ADCP arrays have been used to continuously monitor the Gulf Stream's position and strength, providing critical data for climate studies and shipping routes. The high temporal resolution of ADCP data has revealed previously unknown variability in this major current system, including meanders and eddy shedding that affect heat transport.</p>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://oceanexplorer.noaa.gov/technology/acoust-doppler/media/fig1-800.jpg" onclick="openModal(this)">
+                    <div class="image-caption">ADCP deployment for Gulf Stream monitoring from research vessel</div>
+                </div>
+            </div>
+            
+            <p><strong><i class="fas fa-water"></i> Tidal Energy Site Assessment:</strong> In the Bay of Fundy, ADCP measurements have helped identify optimal locations for tidal turbines by characterizing the extreme currents in this region with the world's highest tides. Multi-month deployments provided comprehensive data on current speeds, directions, and turbulence levels essential for turbine design and placement.</p>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://www.nortekgroup.com/assets/images/Ultrabeam-Hydrographic3.jpg" alt="Tidal Energy Assessment" onclick="openModal(this)">
+                    <div class="image-caption">ADCP survey vessel conducting tidal energy site assessment</div>
+                </div>
+            </div>
+            
+            <p><strong><i class="fas fa-exclamation-triangle"></i> Tsunami Warning Systems:</strong> Deep-ocean ADCPs deployed as part of tsunami warning networks can detect the unusual current patterns generated by passing tsunami waves, providing valuable minutes of additional warning time. These systems measure the entire water column movement, unlike pressure sensors that only detect surface expressions.</p>
+        </div>
+            <h3 style="margin-top: 2.5rem;"><i class="fas fa-binoculars"></i> Data Interpretation</h3>
+            <p>The current profile visualization shows typical oceanographic features that ADCPs can detect with high precision:</p>
+            <ul>
+                <li><strong><i class="fas fa-water"></i> Surface Layer:</strong> Often shows highest velocities due to wind forcing and wave action, with potential shear from atmospheric interactions</li>
+                <li><strong><i class="fas fa-layer-group"></i> Thermocline:</strong> Frequently visible as a change in current patterns where density gradients affect flow dynamics</li>
+                <li><strong><i class="fas fa-mountain"></i> Bottom Boundary Layer:</strong> Shows reduced flow near the seabed due to frictional effects, important for sediment transport</li>
+                <li><strong><i class="fas fa-random"></i> Shear Zones:</strong> Areas where current direction or speed changes rapidly with depth, indicating water mass boundaries or internal waves</li>
+                <li><strong><i class="fas fa-arrows-alt-v"></i> Vertical Structure:</strong> Reveals layered flow patterns that might indicate different water masses or tidal phase variations</li>
+            </ul>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://www.researchgate.net/profile/Lee-Harrison-3/publication/272027641/figure/fig10/AS:272727248470030@1442034651242/Three-dimensional-velocity-data-collected-with-an-ADCP-during-a-five-year-flood-showing.png" alt="ADCP Data Example" onclick="openModal(this)">
+                    <div class="image-caption">Example of real ADCP data showing complex current structure</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="references" id="references">
+            <h2><i class="fas fa-book" style="margin-right: 15px;"></i>References & Resources</h2>
+            <ul>
+                <li><a href="https://www.teledynemarine.com/adcp" target="_blank"><i class="fas fa-external-link-alt"></i> Teledyne Marine ADCP Technology</a> - Comprehensive manufacturer information with technical specifications</li>
+                <li><a href="https://www.nortekgroup.com/products/waves/adcp" target="_blank"><i class="fas fa-external-link-alt"></i> Nortek ADCP Solutions</a> - Technical specifications and case studies from another leading manufacturer</li>
+                <li><a href="https://www.noaa.gov/education/resource-collections/ocean-coasts/ocean-currents" target="_blank"><i class="fas fa-external-link-alt"></i> NOAA Ocean Currents Education</a> - Educational materials about ocean circulation and measurement techniques</li>
+                <li><a href="https://www.sciencedirect.com/topics/earth-and-planetary-sciences/acoustic-doppler-current-profiler" target="_blank"><i class="fas fa-external-link-alt"></i> ADCP Scientific Overview</a> - Peer-reviewed technical information from ScienceDirect</li>
+                <li><a href="https://www.youtube.com/watch?v=5J-0iWZFF0g" target="_blank"><i class="fab fa-youtube"></i> How ADCPs Work (Video)</a> - Visual explanation of ADCP principles from Ocean Instruments</li>
+                <li><a href="https://www.whoi.edu/know-your-ocean/ocean-topics/ocean-circulation/currents-eddies/" target="_blank"><i class="fas fa-external-link-alt"></i> WHOI Currents and Eddies</a> - Research applications from Woods Hole Oceanographic Institution</li>
+                <li><a href="https://www.ioos.noaa.gov/" target="_blank"><i class="fas fa-external-link-alt"></i> IOOS Program</a> - National ADCP monitoring network data and resources</li>
+                <li><a href="https://www.adcp-research.org/" target="_blank"><i class="fas fa-external-link-alt"></i> ADCP Research Consortium</a> - Collaborative research portal with technical papers</li>
+            </ul>
+            
+            <h3><i class="fas fa-graduation-cap"></i> Further Reading</h3>
+            <ul>
+                <li><i class="fas fa-book"></i> "Principles of Oceanographic Instrument Design" - Comprehensive technical reference for sensor design and deployment</li>
+                <li><i class="fas fa-book"></i> "Coastal Ocean Observing Systems" - Detailed applications of ADCP in integrated monitoring networks</li>
+                <li><i class="fas fa-book"></i> "Doppler Sonar and Current Measurement" - Historical development of the technology with theoretical foundations</li>
+                <li><i class="fas fa-newspaper"></i> Journal of Atmospheric and Oceanic Technology - Peer-reviewed ADCP applications and methodological advances</li>
+                <li><i class="fas fa-file-pdf"></i> "Best Practices for ADCP Deployment and Data Processing" - Technical manual from oceanographic institutions</li>
+            </ul>
+            
+            <div class="image-container">
+                <div class="image-card">
+                    <img src="https://www.nortekgroup.com/assets/images/037-Top-quality-data-1.png" alt="ADCP Data Processing" onclick="openModal(this)">
+                    <div class="image-caption">Advanced ADCP data processing and visualization</div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fas fa-water" style="margin-right: 10px;"></i>ADCP Monitoring System | © 2023 Oceanographic Instruments Ltd.</p>
+            <p><i class="fas fa-info-circle" style="margin-right: 10px;"></i>This is a demonstration interface for educational purposes | Contact: info@oceaninst.com</p>
+            <p style="margin-top: 1rem;">
+                <a href="#" style="color: var(--primary-blue); margin: 0 10px;"><i class="fab fa-twitter"></i></a>
+                <a href="#" style="color: var(--primary-blue); margin: 0 10px;"><i class="fab fa-linkedin"></i></a>
+                <a href="#" style="color: var(--primary-blue); margin: 0 10px;"><i class="fab fa-youtube"></i></a>
+                <a href="#" style="color: var(--primary-blue); margin: 0 10px;"><i class="fas fa-envelope"></i></a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
